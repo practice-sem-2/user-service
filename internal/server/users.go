@@ -109,6 +109,19 @@ func (u *UserServer) DeleteUser(ctx context.Context, r *pb.DeleteUserRequest) (*
 	return &pb.DeleteUserResponse{}, wrapError(err)
 }
 
+func (u *UserServer) GetUserByCredentials(ctx context.Context, r *pb.GetUserByCredentialsRequest) (*pb.GetUserResponse, error) {
+	user, err := u.ucase.Users.GetUserByCredentials(ctx, r.Username, r.Password)
+
+	if err != nil {
+		return nil, wrapError(err)
+	}
+
+	return &pb.GetUserResponse{
+		User: ToUserData(user),
+	}, nil
+
+}
+
 func NewUserServer(ucase *usecase.UseCase) *UserServer {
 	return &UserServer{
 		ucase: ucase,

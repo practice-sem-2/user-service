@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"github.com/practice-sem-2/user-service/internal/models"
+	storage "github.com/practice-sem-2/user-service/internal/storages"
 )
 
 type UserCRUD interface {
@@ -34,12 +35,29 @@ func hashPassword(password string) string {
 	return hex.EncodeToString(hasher.Sum([]byte(password)))
 }
 
+func verifyPassword(password string, hash string) bool {
+	return hashPassword(password) == hash
+}
+
 func (u *UserUseCase) GetByUsername(ctx context.Context, username string) (*models.User, error) {
 	return u.store.GetUserByUsername(ctx, username)
 }
 
 func (u *UserUseCase) GetByEmail(ctx context.Context, email string) (*models.User, error) {
 	return u.store.GetUserByEmail(ctx, email)
+}
+
+func (u *UserUseCase) GetUserByCredentials(ctx context.Context, username string, password string) (*models.User, error) {
+	user, err := u.GetByUsername(ctx, username)
+
+	if err != nil {
+		return nil, err
+	}
+	if verifyPassword(password, user.PasswordHash) {
+		return user, nil
+	} else {
+		return nil, storage.ErrUserNotFound
+	}
 }
 
 func (u *UserUseCase) Update(ctx context.Context, username string, fields models.UpdateFields) (*models.User, error) {

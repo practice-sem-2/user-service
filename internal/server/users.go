@@ -17,9 +17,10 @@ type UserServer struct {
 }
 
 var (
-	ErrUserNotFound       = status.Error(codes.NotFound, "user with provided username does not exist")
-	ErrUserAlreadyExists  = status.Error(codes.AlreadyExists, "user already exists")
-	ErrEmailAlreadyExists = status.Error(codes.AlreadyExists, "provided email is already taken")
+	ErrUserNotFound          = status.Error(codes.NotFound, "user with provided username does not exist")
+	ErrUserAlreadyExists     = status.Error(codes.AlreadyExists, "user already exists")
+	ErrEmailAlreadyExists    = status.Error(codes.AlreadyExists, "provided email is already taken")
+	ErrInvalidActivationCode = status.Error(codes.InvalidArgument, "provided activation code is invalid")
 )
 
 func wrapError(err error) error {
@@ -30,6 +31,7 @@ func wrapError(err error) error {
 		{from: storage.ErrUserNotFound, to: ErrUserNotFound},
 		{from: storage.ErrUserAlreadyExists, to: ErrUserAlreadyExists},
 		{from: storage.ErrEmailAlreadyExists, to: ErrEmailAlreadyExists},
+		{from: storage.ErrInvalidCode, to: ErrInvalidActivationCode},
 	}
 
 	if err == nil {
@@ -104,8 +106,8 @@ func (s *UserServer) GetManyUsers(ctx context.Context, r *pb.GetManyUsersRequest
 }
 
 func (s *UserServer) ActivateUser(ctx context.Context, r *pb.ActivateRequest) (*pb.ActivateResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	err := s.ucase.Users.Activate(ctx, r.Username, r.Code)
+	return &pb.ActivateResponse{}, wrapError(err)
 }
 
 func (s *UserServer) UpdateUser(ctx context.Context, r *pb.UpdateUserRequest) (*pb.UpdateUserResponse, error) {

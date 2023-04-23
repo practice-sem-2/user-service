@@ -43,6 +43,7 @@ var (
 	ErrEmailAlreadyExists = errors.New("user with provided email already exists")
 	ErrUserAlreadyExists  = errors.New("user with provided username already exists")
 	ErrUserNotFound       = errors.New("user not found")
+	ErrInvalidCode        = errors.New("activation code is incorrect")
 )
 
 func (s *UserStorage) CreateUser(ctx context.Context, user *models.UserCreate) (*models.User, error) {
@@ -171,6 +172,51 @@ func (s *UserStorage) UpdateUser(ctx context.Context, username string, fields mo
 	}
 
 	return user, nil
+}
+
+func (s *UserStorage) ActivateUser(ctx context.Context, username string, code string) error {
+	query, args, err := sq.
+		Select("username, code").From("users").
+		LeftJoin("users_activation_codes c ON u.username = c.code").
+		Where(sq.Eq{"username": username, "code": code}).
+		Suffix("FOR UPDATE").
+		PlaceholderFormat(sq.Dollar).
+		ToSql()
+
+	var data []struct {
+		Username string  `db:"username"`
+		Code     *string `db:"code"`
+	}
+
+	err = s.db.SelectContext(ctx, &data, query, args...)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrUserNotFound
+	} else if err != nil {
+		return err
+	}
+
+	if data[0].Code == nil {
+		return ErrInvalidCode
+	}
+
+	query, args, err = sq.Update("users").
+		Set("is_active", true).
+		Where(sq.Eq{"username": username}).
+		ToSql()
+
+	if err != nil {
+		return err
+	}
+
+	if _, err = s.db.ExecContext(ctx, query, args...); err != nil {
+		return err
+	}
+	// No need to reactivation user, so delete all activation codes
+	query, args, err = sq.Delete("users_activation_code").
+		Where(sq.Eq{"username": username}).
+		ToSql()
+
+	return nil
 }
 
 func (s *UserStorage) DeleteUser(ctx context.Context, username string) error {

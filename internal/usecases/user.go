@@ -15,6 +15,7 @@ type UserCRUD interface {
 	UpdateUser(ctx context.Context, username string, fields models.UpdateFields) (*models.User, error)
 	DeleteUser(ctx context.Context, username string) error
 	GetManyUsers(ctx context.Context, usernames []string) ([]models.User, error)
+	ActivateUser(ctx context.Context, username string, code string) error
 }
 
 type UserUseCase struct {
@@ -67,6 +68,10 @@ func (u *UserUseCase) GetUserByCredentials(ctx context.Context, username string,
 
 func (u *UserUseCase) Update(ctx context.Context, username string, fields models.UpdateFields) (*models.User, error) {
 	return u.store.UpdateUser(ctx, username, fields)
+}
+
+func (u *UserUseCase) Activate(ctx context.Context, username, code string) error {
+	return u.store.ActivateUser(ctx, username, code)
 }
 
 func (u *UserUseCase) Delete(ctx context.Context, username string) error {

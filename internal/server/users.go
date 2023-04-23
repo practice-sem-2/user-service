@@ -44,14 +44,14 @@ func wrapError(err error) error {
 	return status.Error(codes.Internal, err.Error())
 }
 
-func (u *UserServer) CreateUser(ctx context.Context, r *pb.CreateUserRequest) (*pb.CreateUserResponse, error) {
+func (s *UserServer) CreateUser(ctx context.Context, r *pb.CreateUserRequest) (*pb.CreateUserResponse, error) {
 	userCreate, err := ParseCreateRequest(r)
 
 	if err != nil {
 		return nil, err
 	}
 
-	user, err := u.ucase.Users.Create(ctx, &userCreate)
+	user, err := s.ucase.Users.Create(ctx, &userCreate)
 
 	if err != nil {
 		return nil, wrapError(err)
@@ -62,16 +62,16 @@ func (u *UserServer) CreateUser(ctx context.Context, r *pb.CreateUserRequest) (*
 	}, nil
 }
 
-func (u *UserServer) GetUser(ctx context.Context, r *pb.GetUserRequest) (*pb.GetUserResponse, error) {
+func (s *UserServer) GetUser(ctx context.Context, r *pb.GetUserRequest) (*pb.GetUserResponse, error) {
 	var user *models.User
 	var err error
 
 	if r.Username == nil && r.Email == nil {
 		return nil, status.Error(codes.InvalidArgument, "Either username or email must be provided")
 	} else if r.Username != nil {
-		user, err = u.ucase.Users.GetByUsername(ctx, *r.Username)
+		user, err = s.ucase.Users.GetByUsername(ctx, *r.Username)
 	} else if r.Email != nil {
-		user, err = u.ucase.Users.GetByEmail(ctx, *r.Email)
+		user, err = s.ucase.Users.GetByEmail(ctx, *r.Email)
 	}
 
 	if err != nil {
@@ -84,7 +84,31 @@ func (u *UserServer) GetUser(ctx context.Context, r *pb.GetUserRequest) (*pb.Get
 
 }
 
-func (u *UserServer) UpdateUser(ctx context.Context, r *pb.UpdateUserRequest) (*pb.UpdateUserResponse, error) {
+func (s *UserServer) GetManyUsers(ctx context.Context, r *pb.GetManyUsersRequest) (*pb.GetManyUsersResponse, error) {
+	users, err := s.ucase.Users.GetMany(ctx, r.Usernames)
+
+	var missingUsers []string = nil
+	if miss, ok := err.(*storage.MissingUsersError); ok {
+		missingUsers = miss.Usernames
+	} else if err != nil {
+		return nil, wrapError(err)
+	}
+	usersData := make([]*pb.UserData, len(users))
+	for i, user := range users {
+		usersData[i] = ToUserData(&user)
+	}
+	return &pb.GetManyUsersResponse{
+		Users:   usersData,
+		Missing: missingUsers,
+	}, nil
+}
+
+func (s *UserServer) ActivateUser(ctx context.Context, r *pb.ActivateRequest) (*pb.ActivateResponse, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s *UserServer) UpdateUser(ctx context.Context, r *pb.UpdateUserRequest) (*pb.UpdateUserResponse, error) {
 	update := models.UpdateFields{
 		Password:  nil,
 		Email:     nil,
@@ -93,7 +117,7 @@ func (u *UserServer) UpdateUser(ctx context.Context, r *pb.UpdateUserRequest) (*
 		AvatarID:  r.AvatarId,
 	}
 
-	user, err := u.ucase.Users.Update(ctx, r.Username, update)
+	user, err := s.ucase.Users.Update(ctx, r.Username, update)
 
 	if err != nil {
 		return nil, wrapError(err)
@@ -104,13 +128,13 @@ func (u *UserServer) UpdateUser(ctx context.Context, r *pb.UpdateUserRequest) (*
 	}, nil
 }
 
-func (u *UserServer) DeleteUser(ctx context.Context, r *pb.DeleteUserRequest) (*pb.DeleteUserResponse, error) {
-	err := u.ucase.Users.Delete(ctx, r.Username)
+func (s *UserServer) DeleteUser(ctx context.Context, r *pb.DeleteUserRequest) (*pb.DeleteUserResponse, error) {
+	err := s.ucase.Users.Delete(ctx, r.Username)
 	return &pb.DeleteUserResponse{}, wrapError(err)
 }
 
-func (u *UserServer) GetUserByCredentials(ctx context.Context, r *pb.GetUserByCredentialsRequest) (*pb.GetUserResponse, error) {
-	user, err := u.ucase.Users.GetUserByCredentials(ctx, r.Username, r.Password)
+func (s *UserServer) GetUserByCredentials(ctx context.Context, r *pb.GetUserByCredentialsRequest) (*pb.GetUserResponse, error) {
+	user, err := s.ucase.Users.GetUserByCredentials(ctx, r.Username, r.Password)
 
 	if err != nil {
 		return nil, wrapError(err)

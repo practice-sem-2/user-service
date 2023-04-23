@@ -14,6 +14,7 @@ type UserCRUD interface {
 	GetUserByEmail(ctx context.Context, email string) (*models.User, error)
 	UpdateUser(ctx context.Context, username string, fields models.UpdateFields) (*models.User, error)
 	DeleteUser(ctx context.Context, username string) error
+	GetManyUsers(ctx context.Context, usernames []string) ([]models.User, error)
 }
 
 type UserUseCase struct {
@@ -45,6 +46,10 @@ func (u *UserUseCase) GetByUsername(ctx context.Context, username string) (*mode
 
 func (u *UserUseCase) GetByEmail(ctx context.Context, email string) (*models.User, error) {
 	return u.store.GetUserByEmail(ctx, email)
+}
+
+func (u *UserUseCase) GetMany(ctx context.Context, usernames []string) ([]models.User, error) {
+	return u.store.GetManyUsers(ctx, usernames)
 }
 
 func (u *UserUseCase) GetUserByCredentials(ctx context.Context, username string, password string) (*models.User, error) {

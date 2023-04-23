@@ -4,10 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	sq "github.com/Masterminds/squirrel"
 	"github.com/jackc/pgx"
 	"github.com/practice-sem-2/user-service/internal/models"
 	"reflect"
+	"strings"
 )
 
 type UserStorage struct {
@@ -26,6 +28,15 @@ func NewUserStorage(db Scope) UserStorage {
 		updateUser: sq.Update("users").PlaceholderFormat(sq.Dollar),
 		deleteUser: sq.Delete("users").PlaceholderFormat(sq.Dollar),
 	}
+}
+
+type MissingUsersError struct {
+	Usernames []string
+}
+
+func (e *MissingUsersError) Error() string {
+	users := strings.Join(e.Usernames, ", ")
+	return fmt.Sprintf("several users are not exists: %s", users)
 }
 
 var (
@@ -94,6 +105,37 @@ func (s *UserStorage) GetUserByEmail(ctx context.Context, email string) (*models
 	} else {
 		return &user, err
 	}
+}
+
+func (s *UserStorage) GetManyUsers(ctx context.Context, usernames []string) ([]models.User, error) {
+	q := make(sq.Or, len(usernames))
+	for i, name := range usernames {
+		q[i] = sq.Eq{"username": name}
+	}
+	query, args, err := s.selectUser.Where(q).ToSql()
+	if err != nil {
+		return nil, err
+	}
+	users := make([]models.User, 0, len(usernames))
+	err = s.db.SelectContext(ctx, &users, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	if len(users) < len(usernames) {
+		missingCount := len(usernames) - len(users)
+		hashmap := make(map[string]struct{}, missingCount)
+		for _, user := range users {
+			hashmap[user.Username] = struct{}{}
+		}
+		missing := make([]string, 0, missingCount)
+		for _, username := range usernames {
+			if _, ok := hashmap[username]; !ok {
+				missing = append(missing, username)
+			}
+		}
+		return users, &MissingUsersError{Usernames: missing}
+	}
+	return users, err
 }
 
 func (s *UserStorage) UpdateUser(ctx context.Context, username string, fields models.UpdateFields) (*models.User, error) {
